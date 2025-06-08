@@ -1,0 +1,75 @@
+# plugin.yml
+name: WarManager
+version: 1.0.0
+main: org.Novania.WarManager.WarManager
+api-version: 1.20
+depend: [Towny]
+authors: [SoCook]
+description: Plugin de gestion des guerres entre nations avec système de points et GUI
+
+commands:
+  war:
+    description: Commandes de guerre pour les joueurs
+    usage: /war <help|list|stats>
+    permission: warmanager.use
+    aliases: [guerre, warinfo]
+  waradmin:
+    description: Commandes administratives de guerre
+    usage: /waradmin <create|manage|end|addside|addnation|reload|help>
+    permission: warmanager.admin
+    aliases: [wadmin, warmanage]
+
+permissions:
+  warmanager.*:
+    description: Accès complet à WarManager
+    children:
+      warmanager.admin: true
+      warmanager.use: true
+      warmanager.reload: true
+    default: op
+    
+  warmanager.admin:
+    description: Accès aux commandes administratives
+    children:
+      warmanager.use: true
+      warmanager.reload: true
+      warmanager.create: true
+      warmanager.manage: true
+      warmanager.delete: true
+      warmanager.points: true
+    default: op
+    
+  warmanager.use:
+    description: Utiliser les commandes de base
+    children:
+      warmanager.view: true
+      warmanager.stats: true
+    default: true
+    
+  warmanager.reload:
+    description: Recharger le plugin
+    default: op
+    
+  warmanager.create:
+    description: Créer des guerres
+    default: op
+    
+  warmanager.manage:
+    description: Gérer les guerres existantes
+    default: op
+    
+  warmanager.delete:
+    description: Supprimer des guerres
+    default: op
+    
+  warmanager.points:
+    description: Modifier les points des camps
+    default: op
+    
+  warmanager.view:
+    description: Voir les guerres et statistiques
+    default: true
+    
+  warmanager.stats:
+    description: Voir les statistiques détaillées
+    default: true

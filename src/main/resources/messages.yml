@@ -1,0 +1,86 @@
+# messages.yml
+# Messages du plugin
+prefix: "&8[&cWarManager&8] &r"
+
+commands:
+  no_permission: "&cVous n'avez pas la permission d'utiliser cette commande."
+  player_only: "&cCette commande ne peut être utilisée que par un joueur."
+  invalid_usage: "&cUtilisation incorrecte. Utilisez /war help pour l'aide."
+
+war:
+  created: "&aGuerre créée avec succès ! ID: &e{id}"
+  ended: "&aGuerre terminée ! Vainqueur: &e{winner}"
+  joined: "&aVous avez rejoint le camp &e{side}&a !"
+  kill_registered: "&e{killer} &aa tué &c{victim}&a ! (+{points} points pour {side})"
+  not_in_war: "&cVous n'êtes pas dans une guerre active."
+  
+gui:
+  war_selection: "&8Sélection de guerre"
+  nation_selection: "&8Sélection des nations"
+  war_stats: "&8Statistiques de guerre"
+  
+errors:
+  war_not_found: "&cGuerre introuvable avec l'ID {id}."
+  nation_not_found: "&cNation introuvable: {nation}."
+  already_in_war: "&cCette nation est déjà en guerre."
+
+# Messages pour les zones de capture
+capture_zones:
+  zone_captured: "&6[Zone] {side} &6a capturé la zone &e{zone}&6 !"
+  zone_captured_previous: "&6[Zone] {side} &6a capturé la zone &e{zone}&6 ! &7(Précédemment contrôlée par {previous})"
+  zone_completed: "&a{side} &aa remporté la zone &e{zone}&a ! (+{points} points)"
+  zone_expired_no_winner: "&7Zone &e{zone} &7terminée sans vainqueur (aucun contrôle)"
+  zone_time_remaining: "&7[Zone] Zone &e{zone} &7- Temps restant: &f{minutes} minutes"
+  zone_time_remaining_controller: "&7[Zone] Zone &e{zone} &7- Temps restant: &f{minutes} minutes &7- Contrôlée par &f{controller}"
+  zone_created: "&a✓ Zone de capture créée: &e{zone} &a(ID: &f{id}&a)"
+  zone_deleted: "&a✓ Zone &e{zone} &asupprimée"
+  
+  # Messages d'interaction
+  not_in_nation: "&cVous devez faire partie d'une nation pour capturer une zone !"
+  war_not_active: "&cLa guerre associée à cette zone n'est pas active !"
+  nation_not_in_war: "&cVotre nation n'est pas impliquée dans cette guerre !"
+  zone_expired_interact: "&cCette zone de capture est expirée !"
+  already_controlling: "&eVotre camp contrôle déjà cette zone !"
+  zone_captured_by_you: "&a✓ Zone &e{zone} &acapturée pour {side} !"
+  
+  # Messages de protection
+  block_protected: "&c⚠ Ce bloc fait partie d'une zone de capture et ne peut pas être cassé !"
+  block_protected_detail: "&7Seuls les administrateurs peuvent modifier les zones de capture."
+  place_blocked: "&c⚠ Vous ne pouvez pas placer de blocs dans une zone de capture !"
+  place_blocked_detail: "&7Cette zone est protégée pour maintenir l'intégrité du gameplay."
+  
+  # Statistiques de zone
+  zone_status_header: "&8&m----&r &6Zone: {zone} &8&m----&r"
+  zone_status_time_remaining: "&7Temps restant: &f{minutes} minutes"
+  zone_status_controlled_by: "&7Contrôlée par: {controller}"
+  zone_status_controlled_none: "&7Contrôlée par: &cAucun camp"
+  zone_status_statistics: "&7Statistiques de contrôle:"
+  zone_status_footer: "&8&m------------------------&r"
+  
+  # Messages d'annonce de fin de zone
+  zone_victory_header: "&6&l=== ZONE TERMINÉE ==="
+  zone_victory_winner: "&a{side} &aa remporté la zone &e{zone} &a!"
+  zone_victory_points: "&a+{points} points attribués !"
+  zone_victory_footer: "&6&l=================="
+  
+  # Erreurs admin
+  zone_not_found: "&cZone introuvable avec l'ID {id}"
+  war_must_be_active: "&cLa guerre doit être active pour créer une zone de capture"
+  zone_creation_error: "&cErreur lors de la création de la zone"
+  invalid_war_id: "&cID de guerre invalide"
+  invalid_zone_id: "&cID de zone invalide"
+  no_zones_for_war: "&eAucune zone de capture pour la guerre #{id}"
+  
+  # Informations de zone
+  zone_info_header: "&8&m----&r &6Zone #{id}: {zone} &8&m----&r"
+  zone_info_war: "&7Guerre: &f#{warId}{warName}"
+  zone_info_position: "&7Position: &f{x}, {y}, {z}"
+  zone_info_world: "&7Monde: &f{world}"
+  zone_info_status_active: "&7Statut: &aActive"
+  zone_info_status_finished: "&7Statut: &cTerminée"
+  zone_info_time_remaining: "&7Temps restant: &f{minutes} minutes"
+  zone_info_controlled_by: "&7Contrôlée par: &f{controller}"
+  zone_info_controlled_none: "&7Contrôlée par: &cAucun camp"
+  zone_info_current_control_time: "&7Temps de contrôle actuel: &f{minutes} minutes"
+  zone_info_total_control_stats: "&7Statistiques de contrôle total:"
+  zone_info_footer: "&8&m--------------------------------&r"

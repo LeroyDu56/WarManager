@@ -1,0 +1,72 @@
+# config.yml
+# Configuration WarManager
+settings:
+  # Durée maximale d'une guerre (en jours)
+  max_war_duration: 21
+  
+  # Points requis pour différents types de victoire
+  victory_points:
+    humiliation: 50
+    debt_recovery: 50
+    treaty_violation: 75
+    commercial_control: 75
+    minority_protection: 100
+    liberation: 100
+    disputed_succession: 100
+    honor_dishonored: 25
+    preventive_expansion: 125
+    unjustified_aggression: 125
+    strategic_resources: 150
+    union_restoration: 150
+
+  # Système de points
+  points:
+    kill: 1
+    capture_leader: 10
+    group_battle: 15  # 5v5+
+    siege_success: 20
+
+  # Messages et notifications
+  notifications:
+    kill_broadcast: true
+    war_updates: true
+    daily_summary: true
+
+  # Restrictions
+  restrictions:
+    min_nations_per_side: 1
+    max_nations_per_side: 10
+    cooldown_between_wars: 7  # jours
+
+# Système de capture de zone
+capture_zones:
+  enabled: true
+  default_duration_hours: 3
+  victory_points: 20
+  chunk_radius: 1  # Rayon en chunks (1 = 3x3 chunks)
+  announcement_intervals: [30, 15, 5, 1]  # Minutes restantes pour annoncer
+  flag_height_offset: 1  # Hauteur du drapeau au-dessus du sol
+  support_block_material: "COBBLESTONE"  # Matériau du bloc de support
+  
+  # Matériaux des drapeaux selon les couleurs des camps
+  flag_materials:
+    "§c": "RED_BANNER"      # Rouge
+    "§9": "BLUE_BANNER"     # Bleu
+    "§a": "GREEN_BANNER"    # Vert
+    "§e": "YELLOW_BANNER"   # Jaune
+    "§6": "ORANGE_BANNER"   # Orange
+    "§5": "PURPLE_BANNER"   # Violet
+    "§b": "CYAN_BANNER"     # Cyan
+    "§f": "WHITE_BANNER"    # Blanc
+    "§0": "BLACK_BANNER"    # Noir
+    "§7": "GRAY_BANNER"     # Gris
+    
+# Base de données
+database:
+  type: "SQLITE"  # SQLITE ou MYSQL
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "warmanager"
+    username: "root"
+    password: "password"
