@@ -1,10 +1,10 @@
 package org.Novania.WarManager.gui;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
+
 
 import org.Novania.WarManager.WarManager;
 import org.Novania.WarManager.models.War;
@@ -12,156 +12,109 @@ import org.Novania.WarManager.models.WarSide;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.HandlerList;
-import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-public class SideSelectionGUI implements Listener {
+public class SideManagementGUI {
     
     private final WarManager plugin;
     private final War war;
-    private final String nationName;
-    private final UUID playerUUID;
-    private static final Set<UUID> processingPlayers = new HashSet<>();
-    private boolean isActive = true;
+    private static final long CHAT_TIMEOUT = 30000; // 30 secondes
     
-    public SideSelectionGUI(WarManager plugin, War war, String nationName, Player player) {
+    public SideManagementGUI(WarManager plugin, War war) {
         this.plugin = plugin;
         this.war = war;
-        this.nationName = nationName;
-        this.playerUUID = player.getUniqueId();
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        
-        plugin.getLogger().info("SideSelectionGUI créé pour " + nationName + " par " + player.getName());
     }
     
     public void openGUI(Player player) {
-        if (!isActive) {
-            plugin.getLogger().warning("Tentative d'ouverture d'un GUI désactivé pour " + nationName);
-            return;
-        }
+        int size = 54;
+        Inventory inv = Bukkit.createInventory(null, size, "§cGestion des camps - Guerre #" + war.getId());
         
-        int size = 27;
-        String title = "§6Camp pour §e" + nationName + " §6- " + player.getName();
+        // Informations sur la guerre
+        ItemStack warInfo = createWarInfoItem();
+        inv.setItem(4, warInfo);
         
-        Inventory inv = Bukkit.createInventory(null, size, title);
+        // Bouton pour ajouter un camp
+        ItemStack addSide = createAddSideButton();
+        inv.setItem(10, addSide);
         
-        // Ajouter une info sur la nation
-        ItemStack nationInfo = new ItemStack(Material.NAME_TAG);
-        ItemMeta nationMeta = nationInfo.getItemMeta();
-        if (nationMeta != null) {
-            nationMeta.setDisplayName("§e§lNation: §f" + nationName);
-            List<String> nationLore = new ArrayList<>();
-            nationLore.add("§7Choisissez un camp pour cette nation");
-            nationLore.add("§7Joueur: §f" + player.getName());
-            nationLore.add("");
-            
-            // Vérifier si déjà dans un camp
-            WarSide currentSide = getCurrentSide();
-            if (currentSide != null) {
-                nationLore.add("§6Actuellement dans: " + currentSide.getDisplayName());
-                nationLore.add("§7Cliquez sur un autre camp pour changer");
-            } else {
-                nationLore.add("§7Non assignée à un camp");
-            }
-            
-            nationMeta.setLore(nationLore);
-            nationInfo.setItemMeta(nationMeta);
-        }
-        inv.setItem(4, nationInfo);
+        // Afficher les camps existants
+        displayExistingSides(inv);
         
-        // Ajouter les camps disponibles
-        List<WarSide> sides = war.getSides();
-        int[] sideSlots = {10, 12, 14, 16}; // Positions pour les camps
-        
-        for (int i = 0; i < Math.min(sides.size(), 4); i++) {
-            WarSide side = sides.get(i);
-            ItemStack sideItem = createSideItem(side);
-            inv.setItem(sideSlots[i], sideItem);
-        }
-        
-        // Bouton pour retirer de tous les camps
-        WarSide currentSide = getCurrentSide();
-        if (currentSide != null) {
-            ItemStack removeButton = new ItemStack(Material.BARRIER);
-            ItemMeta removeMeta = removeButton.getItemMeta();
-            if (removeMeta != null) {
-                removeMeta.setDisplayName("§c✖ Retirer de la guerre");
-                List<String> removeLore = new ArrayList<>();
-                removeLore.add("§7Retirer §f" + nationName + " §7de tous les camps");
-                removeLore.add("§c§lClic pour confirmer");
-                removeMeta.setLore(removeLore);
-                removeButton.setItemMeta(removeMeta);
-            }
-            inv.setItem(20, removeButton);
-        }
-        
-        // Bouton retour
-        ItemStack backButton = new ItemStack(Material.ARROW);
-        ItemMeta backMeta = backButton.getItemMeta();
-        if (backMeta != null) {
-            backMeta.setDisplayName("§c← Retour");
-            List<String> backLore = new ArrayList<>();
-            backLore.add("§7Retourner à la sélection des nations");
-            backMeta.setLore(backLore);
-            backButton.setItemMeta(backMeta);
-        }
-        inv.setItem(22, backButton);
+        // Boutons utilitaires
+        addUtilityButtons(inv);
         
         player.openInventory(inv);
-        plugin.getLogger().info("GUI ouvert pour " + nationName + " à " + player.getName());
     }
     
-    private ItemStack createSideItem(WarSide side) {
+    private ItemStack createWarInfoItem() {
+        ItemStack warInfo = new ItemStack(Material.BOOK);
+        ItemMeta warMeta = warInfo.getItemMeta();
+        if (warMeta != null) {
+            warMeta.setDisplayName("§e§lGuerre: §f" + war.getName());
+            List<String> warLore = new ArrayList<>();
+            warLore.add("§7ID: §f" + war.getId());
+            warLore.add("§7Type: §f" + war.getCasusBeliType());
+            warLore.add("§7Points requis: §f" + war.getRequiredPoints());
+            warLore.add("§7Camps actuels: §f" + war.getSides().size());
+            warMeta.setLore(warLore);
+            warInfo.setItemMeta(warMeta);
+        }
+        return warInfo;
+    }
+    
+    private ItemStack createAddSideButton() {
+        ItemStack addSide = new ItemStack(Material.EMERALD_BLOCK);
+        ItemMeta addMeta = addSide.getItemMeta();
+        if (addMeta != null) {
+            addMeta.setDisplayName("§a§l+ Ajouter un Camp");
+            List<String> addLore = new ArrayList<>();
+            addLore.add("§7Créer un nouveau camp pour cette guerre");
+            addLore.add("§e§lClic pour commencer");
+            addMeta.setLore(addLore);
+            addSide.setItemMeta(addMeta);
+        }
+        return addSide;
+    }
+    
+    private void displayExistingSides(Inventory inv) {
+        List<WarSide> sides = war.getSides();
+        int[] sideSlots = {19, 21, 23, 25, 28, 30, 32, 34}; // 8 emplacements max
+        
+        for (int i = 0; i < Math.min(sides.size(), 8); i++) {
+            WarSide side = sides.get(i);
+            ItemStack sideItem = createSideManagementItem(side);
+            inv.setItem(sideSlots[i], sideItem);
+        }
+    }
+    
+    private ItemStack createSideManagementItem(WarSide side) {
         ItemStack item = new ItemStack(Material.WHITE_BANNER);
         ItemMeta meta = item.getItemMeta();
         
         if (meta != null) {
-            meta.setDisplayName(side.getDisplayName());
+            meta.setDisplayName(side.getDisplayName() + " §7(§f" + side.getName() + "§7)");
             
             List<String> lore = new ArrayList<>();
             lore.add("§7Points: §f" + side.getPoints() + "/" + war.getRequiredPoints());
+            lore.add("§7Kills: §f" + side.getKills());
             lore.add("§7Nations: §f" + side.getNations().size());
             lore.add("");
             
             if (!side.getNations().isEmpty()) {
-                lore.add("§6Membres actuels:");
+                lore.add("§6Nations dans ce camp:");
                 for (String nation : side.getNations()) {
-                    if (nation.equals(nationName)) {
-                        lore.add("  §a✓ " + nation + " §7(actuel)");
-                    } else {
-                        lore.add("  §7- " + nation);
-                    }
+                    lore.add("  §7- §f" + nation);
                 }
                 lore.add("");
             }
             
-            if (side.hasNation(nationName)) {
-                lore.add("§a§l✓ Nation déjà dans ce camp");
-                item.setType(Material.LIME_BANNER);
-            } else {
-                lore.add("§e§lClic pour rejoindre ce camp");
-                
-                // Couleur différente selon le camp
-                switch (side.getColor()) {
-                    case "§c": item.setType(Material.RED_BANNER); break;
-                    case "§9": item.setType(Material.BLUE_BANNER); break;
-                    case "§a": item.setType(Material.GREEN_BANNER); break;
-                    case "§e": item.setType(Material.YELLOW_BANNER); break;
-                    case "§6": item.setType(Material.ORANGE_BANNER); break;
-                    case "§5": item.setType(Material.PURPLE_BANNER); break;
-                    case "§b": item.setType(Material.CYAN_BANNER); break;
-                    case "§0": item.setType(Material.BLACK_BANNER); break;
-                    case "§7": item.setType(Material.GRAY_BANNER); break;
-                    default: item.setType(Material.WHITE_BANNER); break;
-                }
-            }
+            lore.add("§c§lClic gauche §7pour supprimer");
+            lore.add("§e§lClic droit §7pour modifier");
             
+            setBannerColorByCode(item, side.getColor());
             meta.setLore(lore);
             item.setItemMeta(meta);
         }
@@ -169,160 +122,248 @@ public class SideSelectionGUI implements Listener {
         return item;
     }
     
-    private WarSide getCurrentSide() {
-        for (WarSide side : war.getSides()) {
-            if (side.hasNation(nationName)) {
-                return side;
-            }
-        }
-        return null;
-    }
-    
-    private void deactivate() {
-        isActive = false;
-        HandlerList.unregisterAll(this);
-        plugin.getLogger().info("SideSelectionGUI désactivé pour " + nationName);
-    }
-    
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer().getUniqueId().equals(playerUUID) && 
-            event.getView().getTitle().contains("§6Camp pour §e" + nationName)) {
-            
-            plugin.getLogger().info("Inventaire fermé pour " + nationName + " - désactivation du GUI");
-            deactivate();
+    private void setBannerColorByCode(ItemStack item, String color) {
+        switch (color) {
+            case "§c" -> item.setType(Material.RED_BANNER);
+            case "§9" -> item.setType(Material.BLUE_BANNER);
+            case "§a" -> item.setType(Material.GREEN_BANNER);
+            case "§e" -> item.setType(Material.YELLOW_BANNER);
+            case "§6" -> item.setType(Material.ORANGE_BANNER);
+            case "§5" -> item.setType(Material.PURPLE_BANNER);
+            case "§b" -> item.setType(Material.CYAN_BANNER);
+            case "§0" -> item.setType(Material.BLACK_BANNER);
+            case "§7" -> item.setType(Material.GRAY_BANNER);
+            default -> item.setType(Material.WHITE_BANNER);
         }
     }
     
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        // Vérifier que c'est le bon GUI et le bon joueur
-        if (!event.getView().getTitle().contains("§6Camp pour §e" + nationName) || 
-            !event.getWhoClicked().getUniqueId().equals(playerUUID)) {
-            return;
+    private void addUtilityButtons(Inventory inv) {
+        // Bouton retour
+        ItemStack backButton = new ItemStack(Material.ARROW);
+        ItemMeta backMeta = backButton.getItemMeta();
+        if (backMeta != null) {
+            backMeta.setDisplayName("§c← Retour");
+            List<String> backLore = new ArrayList<>();
+            backLore.add("§7Retourner à la gestion des nations");
+            backMeta.setLore(backLore);
+            backButton.setItemMeta(backMeta);
         }
+        inv.setItem(49, backButton);
         
-        if (!isActive) {
-            plugin.getLogger().info("Event ignoré - GUI désactivé pour " + nationName);
-            return;
+        // Bouton d'aide
+        ItemStack helpItem = new ItemStack(Material.PAPER);
+        ItemMeta helpMeta = helpItem.getItemMeta();
+        if (helpMeta != null) {
+            helpMeta.setDisplayName("§b§lAide");
+            List<String> helpLore = new ArrayList<>();
+            helpLore.add("§7Gestion des camps:");
+            helpLore.add("§e• Clic gauche §7sur un camp pour le supprimer");
+            helpLore.add("§e• Clic sur + §7pour ajouter un camp");
+            helpLore.add("");
+            helpLore.add("§7Couleurs disponibles:");
+            helpLore.add("§cr §9b §ag §ey §6o §5p §bc §fw §0k §7gray");
+            helpMeta.setLore(helpLore);
+            helpItem.setItemMeta(helpMeta);
         }
-        
-        event.setCancelled(true);
-        
-        Player player = (Player) event.getWhoClicked();
-        
-        // Protection anti-double-clic
-        if (processingPlayers.contains(player.getUniqueId())) {
-            plugin.getLogger().info("Double-clic détecté pour " + player.getName() + " (" + nationName + ") - ignoré");
+        inv.setItem(8, helpItem);
+    }
+    
+    public static void handleClickStatic(InventoryClickEvent event, Player player, WarManager plugin) {
+        if (!event.getView().getTitle().startsWith("§cGestion des camps")) {
             return;
         }
         
         ItemStack item = event.getCurrentItem();
-        
         if (item == null || item.getType() == Material.AIR) {
             return;
         }
         
-        // Marquer le joueur comme en traitement
-        processingPlayers.add(player.getUniqueId());
-        
-        plugin.getLogger().info("Traitement du clic pour " + nationName + " par " + player.getName());
-        
-        // Désactiver ce GUI immédiatement
-        deactivate();
-        
-        // Fermer l'inventaire
+        // Fermer l'inventaire immédiatement
         player.closeInventory();
         
-        try {
-            // Bouton retour
-            if (item.getType() == Material.ARROW) {
-                plugin.getLogger().info("Bouton retour cliqué pour " + nationName);
+        // Bouton retour
+        if (item.getType() == Material.ARROW) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                // new NationSelectionGUI(plugin, war).openGUI(player);
+                player.sendMessage("§eRetour à la gestion des nations");
+            });
+            return;
+        }
+        
+        // Bouton ajouter un camp
+        if (item.getType() == Material.EMERALD_BLOCK) {
+            if (plugin.getGuiManager() != null) {
+                Map<UUID, String> awaitingInput = plugin.getGuiManager().getAwaitingInput();
+                awaitingInput.put(player.getUniqueId(), "side_name");
+                player.sendMessage("§e§l▶ Création d'un nouveau camp");
+                player.sendMessage("§7Tapez le nom du camp dans le chat:");
+                player.sendMessage("§8(Tapez 'annuler' pour annuler)");
+                
+                // Nettoyer après timeout
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    new NationSelectionGUI(plugin, war).openGUI(player);
-                    processingPlayers.remove(player.getUniqueId());
-                }, 3L);
-                return;
+                    awaitingInput.remove(player.getUniqueId());
+                }, CHAT_TIMEOUT / 50); // Convertir en ticks
             }
-            
-            // Bouton retirer
-            if (item.getType() == Material.BARRIER) {
-                plugin.getLogger().info("Bouton retirer cliqué pour " + nationName);
-                
-                WarSide currentSide = getCurrentSide();
-                if (currentSide != null) {
-                    plugin.getLogger().info("Retrait de " + nationName + " du camp " + currentSide.getName());
-                    plugin.getWarDataManager().removeNationFromSide(war.getId(), currentSide.getName(), nationName);
-                    player.sendMessage("§aNation §f" + nationName + " §aretirée du camp " + currentSide.getDisplayName());
-                }
-                
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    new NationSelectionGUI(plugin, war).openGUI(player);
-                    processingPlayers.remove(player.getUniqueId());
-                }, 3L);
-                return;
-            }
-            
-            // Sélection d'un camp (bannières)
-            if (item.getType().name().contains("BANNER")) {
-                if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
-                    processingPlayers.remove(player.getUniqueId());
-                    return;
-                }
-                
-                String displayName = item.getItemMeta().getDisplayName();
-                plugin.getLogger().info("Camp sélectionné: " + displayName + " pour nation " + nationName);
-                
-                // Trouver le camp correspondant
-                WarSide targetSide = null;
-                for (WarSide side : war.getSides()) {
-                    if (side.getDisplayName().equals(displayName)) {
-                        targetSide = side;
-                        break;
-                    }
-                }
-                
-                if (targetSide != null) {
-                    plugin.getLogger().info("Camp cible trouvé: " + targetSide.getName() + " pour " + nationName);
-                    
-                    // Retirer de l'ancien camp
-                    WarSide currentSide = getCurrentSide();
-                    if (currentSide != null && !currentSide.getName().equals(targetSide.getName())) {
-                        plugin.getLogger().info("Retrait de " + nationName + " du camp " + currentSide.getName());
-                        plugin.getWarDataManager().removeNationFromSide(war.getId(), currentSide.getName(), nationName);
-                    }
-                    
-                    // Ajouter au nouveau camp
-                    if (!targetSide.hasNation(nationName)) {
-                        plugin.getLogger().info("Ajout de " + nationName + " au camp " + targetSide.getName());
-                        plugin.getWarDataManager().addNationToSide(war.getId(), targetSide.getName(), nationName);
-                        player.sendMessage("§aNation §f" + nationName + " §aajoutée au camp " + targetSide.getDisplayName());
-                    } else {
-                        player.sendMessage("§eNation §f" + nationName + " §eest déjà dans ce camp");
-                    }
-                    
-                } else {
-                    plugin.getLogger().warning("Camp cible non trouvé pour: " + displayName + " (nation: " + nationName + ")");
-                    player.sendMessage("§cErreur : Camp non trouvé");
-                }
-                
-                // Retourner au GUI des nations
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    new NationSelectionGUI(plugin, war).openGUI(player);
-                    processingPlayers.remove(player.getUniqueId());
-                }, 3L);
-                return;
-            }
-            
-        } catch (Exception e) {
-            plugin.getLogger().severe("Erreur dans SideSelectionGUI pour " + nationName + ": " + e.getMessage());
-            e.printStackTrace();
-            player.sendMessage("§cErreur lors du changement de camp");
-        } finally {
-            // S'assurer que le joueur soit retiré de la liste de traitement
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                processingPlayers.remove(player.getUniqueId());
-            }, 10L);
+            return;
+        }
+        
+        // Gestion d'un camp existant
+        if (item.getType().name().contains("BANNER")) {
+            handleSideManagement(event, player, item, plugin);
         }
     }
-}
+    
+    private static void handleSideManagement(InventoryClickEvent event, Player player, ItemStack item, WarManager plugin) {
+        if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
+            return;
+        }
+        
+        String displayName = item.getItemMeta().getDisplayName();
+        String realName = extractRealSideName(displayName);
+        
+        if (realName.isEmpty()) {
+            player.sendMessage("§cErreur : Impossible d'identifier le camp");
+            return;
+        }
+        
+        // Traitement asynchrone
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            // Récupérer la guerre depuis le titre de l'inventaire
+            String title = event.getView().getTitle();
+            int warId = extractWarIdFromTitle(title);
+            
+            if (warId == -1) {
+                player.sendMessage("§cErreur : Impossible de déterminer la guerre");
+                return;
+            }
+            
+            War war = plugin.getWarDataManager().getWar(warId);
+            if (war == null) {
+                player.sendMessage("§cErreur : Guerre introuvable");
+                return;
+            }
+            
+            WarSide side = war.getSideByName(realName);
+            if (side != null) {
+                if (event.getClick().isLeftClick()) {
+                    handleSideRemoval(player, side, war, plugin);
+                } else if (event.getClick().isRightClick()) {
+                    player.sendMessage("§7Modification des camps pas encore implémentée");
+                }
+            }
+        });
+    }
+    
+    private static String extractRealSideName(String displayName) {
+        if (displayName.contains("(§f") && displayName.contains("§7)")) {
+            int start = displayName.lastIndexOf("(§f") + 3;
+            int end = displayName.lastIndexOf("§7)");
+            if (start > 2 && end > start) {
+                return displayName.substring(start, end);
+            }
+        }
+        return "";
+    }
+    
+    private static int extractWarIdFromTitle(String title) {
+        try {
+            String[] parts = title.split("Guerre #");
+            if (parts.length > 1) {
+                return Integer.parseInt(parts[1].trim());
+            }
+        } catch (NumberFormatException e) {
+            // Ignore
+        }
+        return -1;
+    }
+    
+    private static void handleSideRemoval(Player player, WarSide side, War war, WarManager plugin) {
+        if (!side.getNations().isEmpty()) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                player.sendMessage("§cImpossible de supprimer un camp qui contient des nations !");
+                player.sendMessage("§7Retirez d'abord toutes les nations du camp " + side.getDisplayName());
+            });
+            return;
+        }
+        
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            plugin.getWarDataManager().removeSideFromWar(war.getId(), side.getName());
+            player.sendMessage("§aCamp " + side.getDisplayName() + " §asupprimé");
+            String logMessage = player.getName() + " a supprimé le camp " + side.getName() + " (guerre #" + war.getId() + ")";
+            plugin.getLogger().info(logMessage);
+            
+            // Rafraîchir le GUI
+            new SideManagementGUI(plugin, war).openGUI(player);
+        });
+    }
+    
+    public static void handleChatInput(Player player, String message, String inputType, 
+                                     Map<UUID, String> awaitingInput, Map<UUID, String> awaitingColor, 
+                                     WarManager plugin) {
+        if (!"side_name".equals(inputType)) return;
+        
+        if (message.length() < 2 || message.length() > 20) {
+            player.sendMessage("§cLe nom doit faire entre 2 et 20 caractères !");
+            return;
+        }
+        
+        awaitingInput.remove(player.getUniqueId());
+        awaitingColor.put(player.getUniqueId(), message);
+        
+        player.sendMessage("§a✓ Nom du camp: §f" + message);
+        player.sendMessage("§7Maintenant, choisissez une couleur:");
+        player.sendMessage("§cr §7(rouge), §9b §7(bleu), §ag §7(vert), §ey §7(jaune)");
+        player.sendMessage("§6o §7(orange), §5p §7(violet), §bc §7(cyan), §fw §7(blanc)");
+        player.sendMessage("§0k §7(noir), §7gray §7(gris)");
+    }
+    
+    public static void handleColorInput(Player player, String message, String sideName, 
+                                      Map<UUID, String> awaitingColor, WarManager plugin) {
+        String color = getColorFromInput(message);
+        if (color == null) {
+            player.sendMessage("§cCouleur invalide ! Couleurs disponibles:");
+            player.sendMessage("§cr §9b §ag §ey §6o §5p §bc §fw §0k §7gray");
+            return;
+        }
+        
+        awaitingColor.remove(player.getUniqueId());
+        
+            // Traiter de manière asynchrone
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                player.sendMessage("§a✓ Camp " + color + sideName + " §acréé avec succès !");
+                String logMessage = player.getName() + " a créé le camp " + sideName;
+                plugin.getLogger().info(logMessage);
+            });
+        });
+    }
+    
+    private static int extractWarIdFromTitle(String title) {
+        try {
+            if (title.contains("Guerre #")) {
+                String[] parts = title.split("Guerre #");
+                if (parts.length > 1) {
+                    String idPart = parts[1].trim();
+                    return Integer.parseInt(idPart);
+                }
+            }
+        } catch (NumberFormatException e) {
+            // Ignore parsing errors
+        }
+        return -1;
+    }
+    
+    private static String getColorFromInput(String input) {
+        return switch (input.toLowerCase()) {
+            case "r", "red", "rouge" -> "§c";
+            case "b", "blue", "bleu" -> "§9";
+            case "g", "green", "vert" -> "§a";
+            case "y", "yellow", "jaune" -> "§e";
+            case "o", "orange" -> "§6";
+            case "p", "purple", "violet" -> "§5";
+            case "c", "cyan" -> "§b";
+            case "w", "white", "blanc" -> "§f";
+            case "k", "black", "noir" -> "§0";
+            case "gray", "grey", "gris" -> "§7";
+            default -> null;
+        };
+    }
