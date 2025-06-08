@@ -5,6 +5,7 @@ import org.Novania.WarManager.commands.WarCommand;
 import org.Novania.WarManager.gui.GUIManager;
 import org.Novania.WarManager.listeners.CaptureZoneListener;
 import org.Novania.WarManager.listeners.CaptureZoneProtectionListener;
+import org.Novania.WarManager.listeners.GUIProtectionListener;
 import org.Novania.WarManager.listeners.PlayerDeathListener;
 import org.Novania.WarManager.managers.CaptureZoneManager;
 import org.Novania.WarManager.managers.ConfigManager;
@@ -68,6 +69,9 @@ public class WarManager extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerDeathListener(this), this);
         getServer().getPluginManager().registerEvents(new CaptureZoneListener(this), this);
         getServer().getPluginManager().registerEvents(new CaptureZoneProtectionListener(this), this);
+        
+        // NOUVEAU: Protection renforcée des GUIs
+        getServer().getPluginManager().registerEvents(new GUIProtectionListener(this), this);
         
         getLogger().info("WarManager activé avec succès !");
     }

@@ -6,7 +6,6 @@ import java.util.Map;
 
 import org.Novania.WarManager.WarManager;
 import org.Novania.WarManager.models.War;
-import org.Novania.WarManager.utils.MessageUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -37,9 +36,18 @@ public class WarSelectionGUI {
             // Retour sur le thread principal pour créer l'inventaire
             Bukkit.getScheduler().runTask(plugin, () -> {
                 int size = Math.max(9, ((wars.size() + 8) / 9) * 9);
-                String title = isAdmin ? "§cGestion des Guerres" : MessageUtils.getMessageRaw("gui.war_selection");
+                
+                // Titre différent selon le mode
+                String title;
+                if (isAdmin) {
+                    title = "§cGestion des Guerres";
+                } else {
+                    title = "§8Sélection de guerre";
+                }
+                
                 Inventory inv = Bukkit.createInventory(null, size, title);
                 
+                // Ajouter les guerres
                 int slot = 0;
                 for (War war : wars.values()) {
                     if (slot < size) {
@@ -83,7 +91,10 @@ public class WarSelectionGUI {
             lore.add("§7Casus Belli: §f" + war.getCasusBeliType());
             lore.add("§7Points requis: §f" + war.getRequiredPoints());
             lore.add("§7Statut: " + (war.isActive() ? "§aActive" : "§cTerminée"));
-            lore.add("§7Date: §f" + war.getStartDate().toLocalDate());
+            
+            if (war.getStartDate() != null) {
+                lore.add("§7Date: §f" + war.getStartDate().toLocalDate());
+            }
             lore.add("");
             
             if (!war.getSides().isEmpty()) {
@@ -118,13 +129,16 @@ public class WarSelectionGUI {
     }
     
     public void handleClick(InventoryClickEvent event, Player player) {
+        // Protection: S'assurer que l'événement est annulé
+        event.setCancelled(true);
+        
         ItemStack item = event.getCurrentItem();
         
         if (item == null || item.getType() == Material.AIR || item.getType() == Material.BARRIER) {
             return;
         }
         
-        if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
+        if (!item.hasItemMeta() || item.getItemMeta() == null || !item.getItemMeta().hasDisplayName()) {
             return;
         }
         
@@ -154,11 +168,11 @@ public class WarSelectionGUI {
                                         player.performCommand("waradmin info " + warId);
                                     } else {
                                         // Clic gauche = gestion via GUI
-                                        new NationSelectionGUI(plugin, war).openGUI(player);
+                                        new org.Novania.WarManager.gui.NationSelectionGUI(plugin, war).openGUI(player);
                                     }
                                 } else {
-                                    // Joueur normal = stats
-                                    new WarStatsGUI(plugin, war).openGUI(player);
+                                    // Joueur normal = stats uniquement
+                                    new org.Novania.WarManager.gui.WarStatsGUI(plugin, war).openGUI(player);
                                 }
                             });
                         } else {
@@ -172,7 +186,7 @@ public class WarSelectionGUI {
             player.sendMessage("§cErreur : ID de guerre invalide");
         } catch (Exception e) {
             player.sendMessage("§cErreur lors de la sélection de la guerre");
-            plugin.getLogger().severe("Erreur dans handleClick WarSelectionGUI : " + e.getMessage());
+            plugin.getLogger().warning("Erreur dans handleClick WarSelectionGUI : " + e.getMessage());
         }
     }
 }

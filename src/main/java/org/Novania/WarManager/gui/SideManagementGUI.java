@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.Novania.WarManager.WarManager;
 import org.Novania.WarManager.models.War;
@@ -29,6 +28,11 @@ public class SideManagementGUI {
     }
     
     public void openGUI(Player player) {
+        // NOUVEAU: Enregistrer le contexte de guerre pour ce joueur
+        if (plugin.getGuiManager() != null) {
+            plugin.getGuiManager().getPlayerWarContext().put(player.getUniqueId(), war.getId());
+        }
+        
         int size = 54;
         Inventory inv = Bukkit.createInventory(null, size, "§cGestion des camps - Guerre #" + war.getId());
         
@@ -124,16 +128,16 @@ public class SideManagementGUI {
     
     private void setBannerColorByCode(ItemStack item, String color) {
         switch (color) {
-            case "§c": item.setType(Material.RED_BANNER); break;
-            case "§9": item.setType(Material.BLUE_BANNER); break;
-            case "§a": item.setType(Material.GREEN_BANNER); break;
-            case "§e": item.setType(Material.YELLOW_BANNER); break;
-            case "§6": item.setType(Material.ORANGE_BANNER); break;
-            case "§5": item.setType(Material.PURPLE_BANNER); break;
-            case "§b": item.setType(Material.CYAN_BANNER); break;
-            case "§0": item.setType(Material.BLACK_BANNER); break;
-            case "§7": item.setType(Material.GRAY_BANNER); break;
-            default: item.setType(Material.WHITE_BANNER); break;
+            case "§c" -> item.setType(Material.RED_BANNER);
+            case "§9" -> item.setType(Material.BLUE_BANNER);
+            case "§a" -> item.setType(Material.GREEN_BANNER);
+            case "§e" -> item.setType(Material.YELLOW_BANNER);
+            case "§6" -> item.setType(Material.ORANGE_BANNER);
+            case "§5" -> item.setType(Material.PURPLE_BANNER);
+            case "§b" -> item.setType(Material.CYAN_BANNER);
+            case "§0" -> item.setType(Material.BLACK_BANNER);
+            case "§7" -> item.setType(Material.GRAY_BANNER);
+            default -> item.setType(Material.WHITE_BANNER);
         }
     }
     
@@ -173,6 +177,9 @@ public class SideManagementGUI {
             return;
         }
         
+        // PROTECTION: S'assurer que l'événement est annulé
+        event.setCancelled(true);
+        
         ItemStack item = event.getCurrentItem();
         if (item == null || item.getType() == Material.AIR) {
             return;
@@ -184,7 +191,16 @@ public class SideManagementGUI {
         // Bouton retour
         if (item.getType() == Material.ARROW) {
             Bukkit.getScheduler().runTask(plugin, () -> {
-                // new NationSelectionGUI(plugin, war).openGUI(player);
+                // Récupérer l'ID de guerre depuis le titre
+                String title = event.getView().getTitle();
+                int warId = extractWarIdFromTitle(title);
+                if (warId != -1) {
+                    War war = plugin.getWarDataManager().getWar(warId);
+                    if (war != null) {
+                        new NationSelectionGUI(plugin, war).openGUI(player);
+                        return;
+                    }
+                }
                 player.sendMessage("§eRetour à la gestion des nations");
             });
             return;
@@ -192,16 +208,18 @@ public class SideManagementGUI {
         
         // Bouton ajouter un camp
         if (item.getType() == Material.EMERALD_BLOCK) {
-            Map<UUID, String> awaitingInput = plugin.getGuiManager().getAwaitingInput();
-            awaitingInput.put(player.getUniqueId(), "side_name");
-            player.sendMessage("§e§l▶ Création d'un nouveau camp");
-            player.sendMessage("§7Tapez le nom du camp dans le chat:");
-            player.sendMessage("§8(Tapez 'annuler' pour annuler)");
-            
-            // Nettoyer après timeout
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                awaitingInput.remove(player.getUniqueId());
-            }, CHAT_TIMEOUT / 50); // Convertir en ticks
+            if (plugin.getGuiManager() != null) {
+                Map<UUID, String> awaitingInput = plugin.getGuiManager().getAwaitingInput();
+                awaitingInput.put(player.getUniqueId(), "side_name");
+                player.sendMessage("§e§l▶ Création d'un nouveau camp");
+                player.sendMessage("§7Tapez le nom du camp dans le chat:");
+                player.sendMessage("§8(Tapez 'annuler' pour annuler)");
+                
+                // Nettoyer après timeout
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    awaitingInput.remove(player.getUniqueId());
+                }, CHAT_TIMEOUT / 50); // Convertir en ticks
+            }
             return;
         }
         
@@ -229,6 +247,11 @@ public class SideManagementGUI {
             // Récupérer la guerre depuis le titre de l'inventaire
             String title = event.getView().getTitle();
             int warId = extractWarIdFromTitle(title);
+            
+            if (warId == -1) {
+                player.sendMessage("§cErreur : Impossible de déterminer la guerre");
+                return;
+            }
             
             War war = plugin.getWarDataManager().getWar(warId);
             if (war == null) {
@@ -260,12 +283,15 @@ public class SideManagementGUI {
     
     private static int extractWarIdFromTitle(String title) {
         try {
-            String[] parts = title.split("Guerre #");
-            if (parts.length > 1) {
-                return Integer.parseInt(parts[1].trim());
+            if (title.contains("Guerre #")) {
+                String[] parts = title.split("Guerre #");
+                if (parts.length > 1) {
+                    String idPart = parts[1].trim();
+                    return Integer.parseInt(idPart);
+                }
             }
         } catch (NumberFormatException e) {
-            // Ignore
+            // Ignore parsing errors
         }
         return -1;
     }
@@ -282,7 +308,8 @@ public class SideManagementGUI {
         Bukkit.getScheduler().runTask(plugin, () -> {
             plugin.getWarDataManager().removeSideFromWar(war.getId(), side.getName());
             player.sendMessage("§aCamp " + side.getDisplayName() + " §asupprimé");
-            plugin.getLogger().info(player.getName() + " a supprimé le camp " + side.getName() + " (guerre #" + war.getId() + ")");
+            String logMessage = player.getName() + " a supprimé le camp " + side.getName() + " (guerre #" + war.getId() + ")";
+            plugin.getLogger().info(logMessage);
             
             // Rafraîchir le GUI
             new SideManagementGUI(plugin, war).openGUI(player);
@@ -320,29 +347,72 @@ public class SideManagementGUI {
         
         awaitingColor.remove(player.getUniqueId());
         
-        // Traiter de manière asynchrone
+        // CORRECTION: Utiliser le contexte de guerre du joueur
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            // Note: Il faudrait récupérer l'ID de guerre depuis le contexte
-            // Pour l'instant, on affiche juste un message de succès
+            War war = null;
+            
+            // Essayer de récupérer depuis le contexte du joueur
+            if (plugin.getGuiManager() != null) {
+                Integer warId = plugin.getGuiManager().getPlayerWarContext().get(player.getUniqueId());
+                if (warId != null) {
+                    war = plugin.getWarDataManager().getWar(warId);
+                    plugin.getLogger().info("DEBUG: Contexte guerre trouvé pour " + player.getName() + " : guerre #" + warId);
+                }
+            }
+            
+            // Fallback: prendre la première guerre active
+            if (war == null) {
+                for (War w : plugin.getWarDataManager().getActiveWars().values()) {
+                    if (w.isActive()) {
+                        war = w;
+                        plugin.getLogger().info("DEBUG: Fallback guerre active : #" + w.getId());
+                        break;
+                    }
+                }
+            }
+            
+            if (war == null) {
+                player.sendMessage("§cErreur : Aucune guerre active trouvée pour créer le camp");
+                plugin.getLogger().warning("ERREUR: Aucune guerre trouvée pour créer le camp " + sideName);
+                return;
+            }
+            
+            final War finalWar = war;
+            
+            plugin.getLogger().info("DEBUG: Création du camp " + sideName + " dans la guerre #" + finalWar.getId());
+            
+            // VRAIMENT créer le camp en base de données
+            plugin.getWarDataManager().addSideToWar(finalWar.getId(), sideName, color);
+            
             Bukkit.getScheduler().runTask(plugin, () -> {
-                player.sendMessage("§a✓ Camp " + color + sideName + " §acréé avec succès !");
-                plugin.getLogger().info(player.getName() + " a créé le camp " + sideName);
+                player.sendMessage("§a✓ Camp " + color + sideName + " §acréé avec succès dans la guerre #" + finalWar.getId() + " !");
+                String logMessage = player.getName() + " a créé le camp " + sideName + " dans la guerre #" + finalWar.getId();
+                plugin.getLogger().info(logMessage);
+                
+                // Rouvrir le GUI de gestion des camps avec la guerre mise à jour
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    War updatedWar = plugin.getWarDataManager().getWar(finalWar.getId());
+                    if (updatedWar != null) {
+                        new SideManagementGUI(plugin, updatedWar).openGUI(player);
+                    }
+                }, 10L); // Petit délai pour que la DB soit mise à jour
             });
         });
     }
     
     private static String getColorFromInput(String input) {
-        switch (input.toLowerCase()) {
-            case "r": case "red": case "rouge": return "§c";
-            case "b": case "blue": case "bleu": return "§9";
-            case "g": case "green": case "vert": return "§a";
-            case "y": case "yellow": case "jaune": return "§e";
-            case "o": case "orange": return "§6";
-            case "p": case "purple": case "violet": return "§5";
-            case "c": case "cyan": return "§b";
-            case "w": case "white": case "blanc": return "§f";
-            case "k": case "black": case "noir": return "§0";
-            case "gray": case "grey": case "gris": return "§7";
-            default: return null;
-        }
+        return switch (input.toLowerCase()) {
+            case "r", "red", "rouge" -> "§c";
+            case "b", "blue", "bleu" -> "§9";
+            case "g", "green", "vert" -> "§a";
+            case "y", "yellow", "jaune" -> "§e";
+            case "o", "orange" -> "§6";
+            case "p", "purple", "violet" -> "§5";
+            case "c", "cyan" -> "§b";
+            case "w", "white", "blanc" -> "§f";
+            case "k", "black", "noir" -> "§0";
+            case "gray", "grey", "gris" -> "§7";
+            default -> null;
+        };
     }
+}

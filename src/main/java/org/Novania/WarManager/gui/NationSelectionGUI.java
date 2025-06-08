@@ -36,6 +36,11 @@ public class NationSelectionGUI {
     }
     
     public void openGUI(Player player) {
+        // NOUVEAU: Enregistrer le contexte de guerre pour ce joueur
+        if (plugin.getGuiManager() != null) {
+            plugin.getGuiManager().getPlayerWarContext().put(player.getUniqueId(), war.getId());
+        }
+        
         // Récupération asynchrone des nations
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             List<Nation> allNations = new ArrayList<>(TownyAPI.getInstance().getNations());
@@ -47,7 +52,7 @@ public class NationSelectionGUI {
                 if (currentPage < 0) currentPage = 0;
                 if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
                 
-                Inventory inv = Bukkit.createInventory(null, 54, MessageUtils.getMessageRaw("gui.nation_selection") + " - Page " + (currentPage + 1));
+                Inventory inv = Bukkit.createInventory(null, 54, MessageUtils.getMessageRaw("gui.nation_selection") + " - Page " + (currentPage + 1) + " - Guerre #" + war.getId());
                 
                 // Calculer les nations à afficher
                 int startIndex = currentPage * NATIONS_PER_PAGE;
@@ -185,6 +190,9 @@ public class NationSelectionGUI {
             return;
         }
         
+        // PROTECTION: S'assurer que l'événement est annulé
+        event.setCancelled(true);
+        
         ItemStack item = event.getCurrentItem();
         if (item == null || item.getType() == Material.AIR) {
             return;
@@ -195,47 +203,106 @@ public class NationSelectionGUI {
         // Fermer immédiatement l'inventaire
         player.closeInventory();
         
-        // Extraire l'ID de guerre depuis le titre
-        String[] titleParts = title.split(" - Page ");
-        if (titleParts.length == 0) return;
+        // Extraire les informations depuis le titre
+        int currentPage = 0;
+        int warId = -1;
         
-        // Récupérer la guerre depuis le cache ou la base
+        // Format: "Sélection des nations - Page X - Guerre #Y"
+        if (title.contains(" - Page ") && title.contains(" - Guerre #")) {
+            String[] parts = title.split(" - ");
+            for (String part : parts) {
+                if (part.startsWith("Page ")) {
+                    try {
+                        currentPage = Integer.parseInt(part.substring(5)) - 1; // -1 car base 1 vers base 0
+                    } catch (NumberFormatException e) {
+                        currentPage = 0;
+                    }
+                } else if (part.startsWith("Guerre #")) {
+                    try {
+                        warId = Integer.parseInt(part.substring(8));
+                    } catch (NumberFormatException e) {
+                        warId = -1;
+                    }
+                }
+            }
+        }
+        
+        // Récupérer la guerre
+        final int finalWarId = warId;
+        final int finalCurrentPage = currentPage;
+        
+        // DEBUG
+        plugin.getLogger().info("=== DEBUG NAVIGATION ===");
+        plugin.getLogger().info("Titre: " + title);
+        plugin.getLogger().info("Slot cliqué: " + slot);
+        plugin.getLogger().info("Type d'item: " + item.getType());
+        plugin.getLogger().info("Page actuelle extraite: " + finalCurrentPage);
+        plugin.getLogger().info("War ID extrait: " + finalWarId);
+        
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            // Navigation
-            if (slot == 45 && item.getType() == Material.ARROW) { // Page précédente
-                // Logique de navigation précédente
+            War war = null;
+            
+            if (finalWarId != -1) {
+                war = plugin.getWarDataManager().getWar(finalWarId);
+            }
+            
+            if (war == null) {
+                war = findWarForContext(plugin);
+            }
+            
+            if (war == null) {
+                player.sendMessage("§cErreur : Aucune guerre active trouvée");
                 return;
             }
             
-            if (slot == 53 && item.getType() == Material.ARROW) { // Page suivante
-                // Logique de navigation suivante
-                return;
-            }
+            final War finalWar = war;
             
-            // Bouton retour
-            if (slot == 47 && item.getType() == Material.RED_STAINED_GLASS_PANE) {
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    new WarSelectionGUI(plugin, true).openGUI(player);
-                });
-                return;
-            }
-            
-            // Bouton gérer les camps
-            if (slot == 51 && item.getType() == Material.EMERALD_BLOCK) {
-                // Logique pour ouvrir SideManagementGUI
-                return;
-            }
-            
-            // Sélection d'une nation (slots 0-44)
-            if (slot < 45 && item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-                String nationName = item.getItemMeta().getDisplayName().substring(2); // Enlever "§a"
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                // Calculer le nombre total de pages pour les vérifications
+                List<Nation> allNations = new ArrayList<>(TownyAPI.getInstance().getNations());
+                int totalPages = Math.max(1, (int) Math.ceil((double) allNations.size() / NATIONS_PER_PAGE));
                 
-                // Traitement asynchrone puis retour sur le thread principal
-                Bukkit.getScheduler().runTask(plugin, () -> {
+                // Navigation - Page précédente
+                if (slot == 45 && item.getType() == Material.ARROW) {
+                    int newPage = Math.max(0, finalCurrentPage - 1);
+                    plugin.getLogger().info("Navigation page précédente: " + finalCurrentPage + " -> " + newPage);
+                    new NationSelectionGUI(plugin, finalWar, newPage).openGUI(player);
+                    return;
+                }
+                
+                // Navigation - Page suivante
+                if (slot == 53 && item.getType() == Material.ARROW) {
+                    int newPage = Math.min(totalPages - 1, finalCurrentPage + 1);
+                    plugin.getLogger().info("Navigation page suivante: " + finalCurrentPage + " -> " + newPage + " (max: " + (totalPages - 1) + ")");
+                    new NationSelectionGUI(plugin, finalWar, newPage).openGUI(player);
+                    return;
+                }
+                
+                // Bouton retour
+                if (slot == 47 && item.getType() == Material.RED_STAINED_GLASS_PANE) {
+                    new WarSelectionGUI(plugin, true).openGUI(player);
+                    return;
+                }
+                
+                // Bouton gérer les camps
+                if (slot == 51 && item.getType() == Material.EMERALD_BLOCK) {
+                    new SideManagementGUI(plugin, finalWar).openGUI(player);
+                    return;
+                }
+                
+                // Sélection d'une nation (slots 0-44)
+                if (slot < 45 && item.hasItemMeta() && item.getItemMeta() != null && item.getItemMeta().hasDisplayName()) {
+                    String nationName = item.getItemMeta().getDisplayName().substring(2); // Enlever "§a"
+                    
                     // Ouvrir le GUI de sélection de camp pour cette nation
-                    // new SideSelectionGUI(plugin, war, nationName, player).openGUI(player);
-                });
-            }
+                    new SideSelectionGUI(plugin, finalWar, nationName, player).openGUI(player);
+                }
+            });
         });
+    }
+    
+    private static War findWarForContext(WarManager plugin) {
+        // Retourner la première guerre active
+        return plugin.getWarDataManager().getActiveWars().values().stream().findFirst().orElse(null);
     }
 }

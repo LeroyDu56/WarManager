@@ -44,7 +44,9 @@ public class WarCommand implements CommandExecutor {
                 break;
                 
             case "list":
-                new WarSelectionGUI(plugin).openGUI(player);
+                // CORRECTION: S'assurer d'utiliser le mode joueur (false)
+                plugin.getLogger().info("Commande /war list par " + player.getName() + " - Mode joueur");
+                new WarSelectionGUI(plugin, false).openGUI(player);
                 break;
                 
             case "stats":

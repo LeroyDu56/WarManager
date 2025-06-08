@@ -152,7 +152,6 @@ public class PlayerDeathListener implements Listener {
         
         // Ajouter les points selon la configuration
         int killPoints = plugin.getConfigManager().getKillPoints();
-        int oldPoints = killerSide.getPoints();
         killerSide.addPoints(killPoints);
         int newPoints = killerSide.getPoints();
         

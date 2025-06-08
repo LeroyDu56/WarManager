@@ -83,8 +83,11 @@ public class WarStatsGUI {
             List<String> lore = new ArrayList<>();
             lore.add("§7Casus Belli: §f" + currentWar.getCasusBeliType());
             lore.add("§7Points pour victoire: §f" + currentWar.getRequiredPoints());
-            lore.add("§7Date de début: §f" + currentWar.getStartDate().toLocalDate());
-            lore.add("§7Heure de début: §f" + currentWar.getStartDate().toLocalTime().toString().substring(0, 5));
+            
+            if (currentWar.getStartDate() != null) {
+                lore.add("§7Date de début: §f" + currentWar.getStartDate().toLocalDate());
+                lore.add("§7Heure de début: §f" + currentWar.getStartDate().toLocalTime().toString().substring(0, 5));
+            }
             lore.add("");
             
             WarSide winner = currentWar.getWinner();

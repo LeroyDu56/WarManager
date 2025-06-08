@@ -1,5 +1,9 @@
 package org.Novania.WarManager.gui;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.Novania.WarManager.WarManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -9,24 +13,17 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.Inventory;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class GUIManager implements Listener {
     
     private final WarManager plugin;
     private final Map<UUID, Long> lastClick = new ConcurrentHashMap<>();
-    private final Set<UUID> processingPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, String> awaitingInput = new ConcurrentHashMap<>();
     private final Map<UUID, String> awaitingColor = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> playerWarContext = new ConcurrentHashMap<>(); // NOUVEAU: Contexte de guerre par joueur
     
     private static final long CLICK_COOLDOWN = 250; // 250ms entre les clics
     
@@ -48,24 +45,8 @@ public class GUIManager implements Listener {
             return false;
         }
         
-        // Vérifier si déjà en traitement
-        if (processingPlayers.contains(uuid)) {
-            return false;
-        }
-        
         lastClick.put(uuid, now);
         return true;
-    }
-    
-    /**
-     * Marque un joueur comme en traitement
-     */
-    public void setProcessing(UUID uuid, boolean processing) {
-        if (processing) {
-            processingPlayers.add(uuid);
-        } else {
-            processingPlayers.remove(uuid);
-        }
     }
     
     /**
@@ -85,6 +66,7 @@ public class GUIManager implements Listener {
             return;
         }
         
+        // IMPORTANT: Annuler TOUS les clics dans nos GUIs
         event.setCancelled(true);
         
         // Vérification anti-spam
@@ -92,12 +74,21 @@ public class GUIManager implements Listener {
             return;
         }
         
-        // Marquer comme en traitement
-        setProcessing(player.getUniqueId(), true);
-        
         try {
+            // DEBUG
+            plugin.getLogger().info("=== DEBUG GUI CLICK ===");
+            plugin.getLogger().info("Titre: " + title);
+            plugin.getLogger().info("Joueur: " + player.getName());
+            plugin.getLogger().info("Permission admin: " + player.hasPermission("warmanager.admin"));
+            
             // Déléguer selon le type de GUI
-            if (title.contains("Gestion des Guerres") || title.contains("Sélection de guerre")) {
+            if (title.contains("Gestion des Guerres")) {
+                // Mode admin uniquement
+                plugin.getLogger().info("Mode: Gestion admin");
+                handleWarSelectionClick(event, player);
+            } else if (title.contains("Sélection de guerre") || title.equals("§8Sélection de guerre")) {
+                // Mode joueur uniquement
+                plugin.getLogger().info("Mode: Sélection joueur");
                 handleWarSelectionClick(event, player);
             } else if (title.contains("Sélection des nations")) {
                 handleNationSelectionClick(event, player);
@@ -108,11 +99,26 @@ public class GUIManager implements Listener {
             } else if (title.contains("Statistiques")) {
                 handleWarStatsClick(event, player);
             }
-        } finally {
-            // Libérer le verrou après un délai
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                setProcessing(player.getUniqueId(), false);
-            }, 10L);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Erreur dans la gestion du clic GUI: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Empêcher le glisser-déposer dans nos GUIs
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player)) {
+            return;
+        }
+        
+        String title = event.getView().getTitle();
+        
+        // Vérifier si c'est un GUI WarManager
+        if (isWarManagerGUI(title)) {
+            // Annuler TOUS les glisser-déposer dans nos GUIs
+            event.setCancelled(true);
         }
     }
     
@@ -121,12 +127,31 @@ public class GUIManager implements Listener {
                title.contains("Camp") || 
                title.contains("Nation") || 
                title.contains("Statistiques") ||
-               title.contains("Gestion");
+               title.contains("Gestion") ||
+               title.contains("Sélection") ||
+               // Messages français
+               title.contains("guerre") ||
+               title.contains("camp") ||
+               title.contains("nation") ||
+               title.contains("statistiques") ||
+               title.contains("gestion") ||
+               title.contains("sélection") ||
+               // Titres spécifiques
+               title.equals("§8Sélection de guerre") ||
+               title.equals("§cGestion des Guerres");
     }
     
     private void handleWarSelectionClick(InventoryClickEvent event, Player player) {
-        // Déléguer à WarSelectionGUI mais de manière optimisée
-        WarSelectionGUI gui = new WarSelectionGUI(plugin, player.hasPermission("warmanager.admin"));
+        String title = event.getView().getTitle();
+        
+        // Déterminer le mode selon le titre exact
+        boolean isAdminMode = title.equals("§cGestion des Guerres");
+        boolean isPlayerMode = title.equals("§8Sélection de guerre");
+        
+        plugin.getLogger().info("handleWarSelectionClick - Admin mode: " + isAdminMode + ", Player mode: " + isPlayerMode);
+        
+        // Déléguer à WarSelectionGUI avec le bon mode
+        WarSelectionGUI gui = new WarSelectionGUI(plugin, isAdminMode);
         gui.handleClick(event, player);
     }
     
@@ -189,12 +214,13 @@ public class GUIManager implements Listener {
      */
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
+        // Nettoyage automatique après fermeture
         UUID uuid = event.getPlayer().getUniqueId();
         
-        // Nettoyer le traitement avec un délai
+        // Nettoyer le cache de clics après un délai
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            setProcessing(uuid, false);
-        }, 5L);
+            lastClick.remove(uuid);
+        }, 100L); // 5 secondes
     }
     
     /**
@@ -204,9 +230,9 @@ public class GUIManager implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
         lastClick.remove(uuid);
-        processingPlayers.remove(uuid);
         awaitingInput.remove(uuid);
         awaitingColor.remove(uuid);
+        playerWarContext.remove(uuid);
     }
     
     /**
@@ -220,14 +246,18 @@ public class GUIManager implements Listener {
         return awaitingColor;
     }
     
+    public Map<UUID, Integer> getPlayerWarContext() {
+        return playerWarContext;
+    }
+    
     /**
      * Nettoyage complet
      */
     public void cleanup() {
         HandlerList.unregisterAll(this);
         lastClick.clear();
-        processingPlayers.clear();
         awaitingInput.clear();
         awaitingColor.clear();
+        playerWarContext.clear();
     }
 }
